@@ -1,3 +1,7 @@
+# tweepy >= 4.9
+# twitter API V2
+
+
 # pip install tweepy
 import tweepy
 
@@ -12,46 +16,35 @@ auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
 auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 
-# 검색할 키워드와 트윗 개수 설정
-keyword = "Elon Musk"
-tweet_count = 10
-
-# 트위터에서 트윗 검색
-# 이전 코드...
-# tweets = tweepy.Cursor(api.search, q=keyword, lang="en").items(tweet_count)
-# 이후 코드...
-tweets = tweepy.Cursor(api.search_tweets, q=keyword, lang="en").items(tweet_count)
 
 
 
-# Google Cloud Natural Language API 인증 설정
-client = language_v1.LanguageServiceClient.from_service_account_json('cogent-theater-398404-f6d67a3989ed.json')
+# tweepy.StreamClient 클래스를 상속받는 클래스
+class TwitterStream(tweepy.StreamingClient):
+    def on_data(self, raw_data):
+        print(raw_data)
 
-# 감정 분석 결과 저장
-sentiments = {"positive": 0, "negative": 0, "neutral": 0}
+# 규칙 제거 함수
+def delete_all_rules(rules):
+    # 규칙 값이 없는 경우 None 으로 들어온다.
+    if rules is None or rules.data is None:
+        return None
+    stream_rules = rules.data
+    ids = list(map(lambda rule: rule.id, stream_rules))
+    client.delete_rules(ids=ids)
 
-for tweet in tweets:
-    text = tweet.text
-    document = language_v1.Document(content=text, type_=language_v1.Document.Type.PLAIN_TEXT)
-    sentiment = client.analyze_sentiment(request={'document': document}).document_sentiment
-    score = sentiment.score
-    magnitude = sentiment.magnitude
+# 스트림 클라이언트 인스터턴스 생성
+client = TwitterStream(access_token)
 
-    if score > 0.1:
-        sentiments["positive"] += 1
-    elif score < -0.1:
-        sentiments["negative"] += 1
-    else:
-        sentiments["neutral"] += 1
+# 모든 규칙 불러오기 - id값을 지정하지 않으면 모든 규칙을 불러옴
+rules = client.get_rules()
 
-# 감정 분석 결과 시각화
-labels = list(sentiments.keys())
-sizes = list(sentiments.values())
+# 모든 규칙 제거
+delete_all_rules(rules)
 
-fig1, ax1 = plt.subplots()
-ax1.pie(sizes, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
-ax1.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+# 스트림 규칙 추가
+client.add_rules(tweepy.StreamRule(value="#Elon_Musk has:images"))
 
-plt.title(f"Sentiment Analysis for '{keyword}'")
-plt.show()
+# 스트림 시작
+client.filter()
 
